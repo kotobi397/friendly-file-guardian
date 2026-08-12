@@ -609,10 +609,26 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const manual = body?.manual === true;
 
+    // وضع «معالجة طابور التقييمات» — يُستدعى من الواجهة أو من cron
+    if (body?.processQueue === true) {
+      try {
+        const max = Math.min(20, Math.max(1, Number(body?.max ?? 12)));
+        return new Response(JSON.stringify(await processReviewQueue(supabase, max)), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (e) {
+        return new Response(
+          JSON.stringify({ success: false, error: e instanceof Error ? e.message : "خطأ غير متوقع" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
     // وضع «سحب أحدث الكتب» من صفحة /latest
     if (body?.latest === true) {
       try {
-        const limit = Math.min(60, Math.max(1, Number(body?.limit ?? 40)));
+        const limit = Math.min(300, Math.max(1, Number(body?.limit ?? 40)));
+
         return new Response(JSON.stringify(await fetchLatestBooks(limit)), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
