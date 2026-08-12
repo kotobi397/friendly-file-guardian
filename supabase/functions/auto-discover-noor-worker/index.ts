@@ -635,6 +635,18 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const manual = body?.manual === true;
 
+    if (body?.probeUrl) {
+      const pr = await fetch(String(body.probeUrl), {
+        headers: { "User-Agent": UA, Accept: "text/html,*/*", "Accept-Language": "ar,en;q=0.9" },
+      });
+      const pt = await pr.text();
+      return new Response(JSON.stringify({ status: pr.status, len: pt.length, head: pt.slice(0, 300) }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+
+
     // وضع «معالجة طابور التقييمات» — يُستدعى من الواجهة أو من cron
     if (body?.processQueue === true) {
       try {
