@@ -467,9 +467,10 @@ async function fetchLatestBooks(limit = 40) {
 
 
 // ---------- نشر تقييم + مراجعة على كتاب في نور بوك ----------
-async function postReview(bookUrl: string, rating: number, text: string) {
-  const s = new Session();
-  await login(s);
+async function postReview(bookUrl: string, rating: number, text: string, session?: Session) {
+  const s = session ?? new Session();
+  if (!session) await login(s);
+
 
   const raw = bookUrl.startsWith("http") ? bookUrl : `${BASE}${bookUrl.startsWith("/") ? "" : "/"}${bookUrl}`;
   const path = raw.replace(/^https?:\/\/(www\.)?noor-book\.com/i, "").replace(/^\/en/, "");
