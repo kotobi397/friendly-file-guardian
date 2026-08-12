@@ -412,14 +412,56 @@ function extractLatestCards(html: string, limit: number) {
 
 async function fetchLatestBooks(limit = 40) {
   const s = new Session();
-  await login(s);
-  const res = await s.get(`${BASE}/latest?landing=false`);
+  try {
+    await login(s);
+  } catch {
+    // صفحة أحدث الكتب عامة، نكمل بدون تسجيل دخول عند الفشل
+  }
+  const listUrl = `${BASE}/latest?landing=false`;
+  const res = await s.get(listUrl);
   const status = res.status;
   const html = res.ok ? await res.text() : "";
-  let books = html ? extractLatestCards(html, limit) : [];
-  if (!books.length && html) books = extractBookCards(html, limit);
-  return { success: true, status, count: books.length, books };
+  const csrf = html.match(/csrf_token\s*=\s*'([^']+)'/i)?.[1] ?? "";
+
+  const seen = new Set<string>();
+  const books: { title: string; url: string; cover: string | null }[] = [];
+  const push = (list: { title: string; url: string; cover: string | null }[]) => {
+    for (const b of list) {
+      if (seen.has(b.url)) continue;
+      seen.add(b.url);
+      books.push(b);
+      if (books.length >= limit) break;
+    }
+  };
+
+  const parse = (h: string) => {
+    const cards = extractLatestCards(h, limit);
+    return cards.length ? cards : extractBookCards(h, limit);
+  };
+
+  if (html) push(parse(html));
+
+  // التمرير اللانهائي في نور بوك: page_ajax=2,3,... مع نفس الجلسة والتوكن
+  let page = 1;
+  while (books.length < limit && page < 30 && Date.now() - startedAt < MAX_MS - 15_000) {
+    page++;
+    const more = await s.get(
+      `${listUrl}&page_ajax=${page}&token=${encodeURIComponent(csrf)}&ls=null`,
+      listUrl,
+    );
+    if (!more.ok) break;
+    const chunk = await more.text();
+    if (!chunk.trim() || chunk.trim() === "no_more") break;
+    const parsed = parse(chunk);
+    if (!parsed.length) break;
+    const before = books.length;
+    push(parsed);
+    if (books.length === before) break; // لا جديد
+  }
+
+  return { success: true, status, count: books.length, pages: page, books };
 }
+
 
 
 // ---------- نشر تقييم + مراجعة على كتاب في نور بوك ----------
