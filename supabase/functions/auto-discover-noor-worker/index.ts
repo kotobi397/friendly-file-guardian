@@ -552,12 +552,31 @@ async function processReviewQueue(supabase: any, max = 12) {
   const list = rows || [];
   if (!list.length) return { success: true, processed: 0, ok: 0, failed: 0, message: "لا توجد كتب بانتظار التقييم" };
 
+  // استبعاد الكتب التي سبق نشر تقييم لها
+  const { data: reviewedRows } = await supabase
+    .from("noor_reviewed_books")
+    .select("book_url")
+    .in("book_url", list.map((r: any) => r.book_url));
+  const already = new Set((reviewedRows || []).map((r: any) => r.book_url));
+  const pendingList = list.filter((r: any) => !already.has(r.book_url));
+  let skipped = 0;
+  for (const row of list.filter((r: any) => already.has(r.book_url))) {
+    skipped++;
+    await supabase
+      .from("noor_review_queue")
+      .update({ status: "skipped", error: "سبق تقييم هذا الكتاب", updated_at: new Date().toISOString() })
+      .eq("id", row.id);
+  }
+  if (!pendingList.length) {
+    return { success: true, processed: 0, ok: 0, failed: 0, skipped, message: "كل الكتب المنتظرة سبق تقييمها" };
+  }
+
   const s = new Session();
   await login(s);
 
   let ok = 0;
   let failed = 0;
-  for (const row of list) {
+  for (const row of pendingList) {
     if (Date.now() - startedAt > MAX_MS - 20_000) break;
     await supabase
       .from("noor_review_queue")
@@ -569,6 +588,12 @@ async function processReviewQueue(supabase: any, max = 12) {
         .from("noor_review_queue")
         .update({ status: "done", error: null, posted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
         .eq("id", row.id);
+      await supabase
+        .from("noor_reviewed_books")
+        .upsert(
+          { book_url: row.book_url, title: row.title, rating: row.rating },
+          { onConflict: "book_url", ignoreDuplicates: true },
+        );
       ok++;
     } catch (e) {
       await supabase
@@ -584,8 +609,9 @@ async function processReviewQueue(supabase: any, max = 12) {
     // فاصل زمني لتجنّب الحظر
     await new Promise((res) => setTimeout(res, 4000));
   }
-  return { success: true, processed: ok + failed, ok, failed };
+  return { success: true, processed: ok + failed, ok, failed, skipped };
 }
+
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });

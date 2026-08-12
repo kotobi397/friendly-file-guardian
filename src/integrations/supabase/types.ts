@@ -2768,6 +2768,33 @@ export type Database = {
         }
         Relationships: []
       }
+      noor_reviewed_books: {
+        Row: {
+          book_url: string
+          created_at: string
+          id: string
+          rating: number | null
+          reviewed_at: string
+          title: string | null
+        }
+        Insert: {
+          book_url: string
+          created_at?: string
+          id?: string
+          rating?: number | null
+          reviewed_at?: string
+          title?: string | null
+        }
+        Update: {
+          book_url?: string
+          created_at?: string
+          id?: string
+          rating?: number | null
+          reviewed_at?: string
+          title?: string | null
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           book_author: string | null
