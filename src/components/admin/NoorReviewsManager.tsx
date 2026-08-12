@@ -238,7 +238,19 @@ const NoorReviewsManager: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-muted-foreground whitespace-nowrap">عدد الكتب للسحب</label>
+              <Input
+                type="number"
+                min={10}
+                max={300}
+                step={10}
+                className="w-24"
+                value={fetchCount}
+                onChange={(e) => setFetchCount(Math.min(300, Math.max(10, Number(e.target.value) || 10)))}
+              />
+            </div>
             <Button onClick={fetchLatest} disabled={fetching || running}>
               {fetching ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : <BookOpen className="h-4 w-4 ml-2" />}
               سحب أحدث الكتب
@@ -247,6 +259,11 @@ const NoorReviewsManager: React.FC = () => {
               {running ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : <Play className="h-4 w-4 ml-2" />}
               بدء التقييم بالتوالي
             </Button>
+            <Button variant="secondary" onClick={runOnServer} disabled={serverRunning || running || !pending}>
+              {serverRunning ? <Loader2 className="h-4 w-4 animate-spin ml-2" /> : <Play className="h-4 w-4 ml-2" />}
+              تشغيل على الخادم (يكمل بدونك)
+            </Button>
+
             {running && (
               <Button variant="destructive" onClick={() => { stopRef.current = true; }}>
                 <Square className="h-4 w-4 ml-2" />
