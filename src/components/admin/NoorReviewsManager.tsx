@@ -36,6 +36,9 @@ const NoorReviewsManager: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
   const [running, setRunning] = useState(false);
+  const [serverRunning, setServerRunning] = useState(false);
+  const [fetchCount, setFetchCount] = useState(200);
+
   const stopRef = useRef(false);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [defaultRating, setDefaultRating] = useState(5);
