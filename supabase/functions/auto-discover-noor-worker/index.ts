@@ -539,10 +539,59 @@ async function postReview(bookUrl: string, rating: number, text: string, session
   };
 }
 
+// ---------- معالجة طابور التقييمات على الخادم (يعمل حتى والمستخدم خارج الموقع) ----------
+async function processReviewQueue(supabase: any, max = 12) {
+  const { data: rows, error } = await supabase
+    .from("noor_review_queue")
+    .select("*")
+    .eq("status", "pending")
+    .order("position", { ascending: true })
+    .order("created_at", { ascending: true })
+    .limit(max);
+  if (error) throw new Error(error.message);
+  const list = rows || [];
+  if (!list.length) return { success: true, processed: 0, ok: 0, failed: 0, message: "لا توجد كتب بانتظار التقييم" };
+
+  const s = new Session();
+  await login(s);
+
+  let ok = 0;
+  let failed = 0;
+  for (const row of list) {
+    if (Date.now() - startedAt > MAX_MS - 20_000) break;
+    await supabase
+      .from("noor_review_queue")
+      .update({ status: "running", error: null, updated_at: new Date().toISOString() })
+      .eq("id", row.id);
+    try {
+      await postReview(row.book_url, row.rating, row.review_text || "", s);
+      await supabase
+        .from("noor_review_queue")
+        .update({ status: "done", error: null, posted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq("id", row.id);
+      ok++;
+    } catch (e) {
+      await supabase
+        .from("noor_review_queue")
+        .update({
+          status: "error",
+          error: (e instanceof Error ? e.message : "خطأ غير متوقع").slice(0, 500),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", row.id);
+      failed++;
+    }
+    // فاصل زمني لتجنّب الحظر
+    await new Promise((res) => setTimeout(res, 4000));
+  }
+  return { success: true, processed: ok + failed, ok, failed };
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const started = Date.now();
+  startedAt = started;
+
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
