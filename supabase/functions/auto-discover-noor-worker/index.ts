@@ -635,6 +635,9 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const manual = body?.manual === true;
 
+
+
+
     // وضع «معالجة طابور التقييمات» — يُستدعى من الواجهة أو من cron
     if (body?.processQueue === true) {
       try {
