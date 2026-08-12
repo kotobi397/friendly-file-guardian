@@ -13,6 +13,8 @@ const BASE = "https://www.noor-book.com";
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36";
 const MAX_MS = 110_000;
+let startedAt = Date.now();
+
 
 // ---------- جلسة مع كوكيز ----------
 class Session {
