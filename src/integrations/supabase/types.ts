@@ -2152,6 +2152,78 @@ export type Database = {
         }
         Relationships: []
       }
+      ktobati_review_queue: {
+        Row: {
+          book_url: string
+          cover_url: string | null
+          created_at: string
+          error: string | null
+          id: string
+          position: number
+          posted_at: string | null
+          rating: number
+          review_text: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          book_url: string
+          cover_url?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          position?: number
+          posted_at?: string | null
+          rating?: number
+          review_text?: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          book_url?: string
+          cover_url?: string | null
+          created_at?: string
+          error?: string | null
+          id?: string
+          position?: number
+          posted_at?: string | null
+          rating?: number
+          review_text?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      ktobati_reviewed_books: {
+        Row: {
+          book_url: string
+          created_at: string
+          id: string
+          rating: number | null
+          reviewed_at: string
+          title: string | null
+        }
+        Insert: {
+          book_url: string
+          created_at?: string
+          id?: string
+          rating?: number | null
+          reviewed_at?: string
+          title?: string | null
+        }
+        Update: {
+          book_url?: string
+          created_at?: string
+          id?: string
+          rating?: number | null
+          reviewed_at?: string
+          title?: string | null
+        }
+        Relationships: []
+      }
       leaderboard_rank_points: {
         Row: {
           created_at: string
