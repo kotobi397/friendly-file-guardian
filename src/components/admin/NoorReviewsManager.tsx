@@ -163,12 +163,29 @@ const NoorReviewsManager: React.FC = () => {
     setCurrentId(row.id);
     await updateRow(row.id, { status: 'running', error: null });
     try {
+      // حماية إضافية: لا تُقيّم كتاباً سبق تقييمه
+      const { data: prev } = await supabase
+        .from('noor_reviewed_books' as any)
+        .select('book_url')
+        .eq('book_url', row.book_url)
+        .maybeSingle();
+      if (prev) {
+        await updateRow(row.id, { status: 'skipped', error: 'سبق تقييم هذا الكتاب' });
+        return true;
+      }
+
       const { data, error } = await supabase.functions.invoke('auto-discover-noor-worker', {
         body: { review: true, bookUrl: row.book_url, rating: row.rating, text: row.review_text },
       });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'فشل النشر');
       await updateRow(row.id, { status: 'done', error: null, posted_at: new Date().toISOString() });
+      await supabase
+        .from('noor_reviewed_books' as any)
+        .upsert(
+          { book_url: row.book_url, title: row.title, rating: row.rating } as any,
+          { onConflict: 'book_url', ignoreDuplicates: true },
+        );
       return true;
     } catch (e: any) {
       await updateRow(row.id, { status: 'error', error: e?.message || 'خطأ غير متوقع' });
@@ -177,6 +194,7 @@ const NoorReviewsManager: React.FC = () => {
       setCurrentId(null);
     }
   };
+
 
   // تقييم الكتب واحداً تلو الآخر
   const runAll = async () => {
