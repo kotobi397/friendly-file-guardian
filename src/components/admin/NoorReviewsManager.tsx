@@ -72,9 +72,17 @@ const NoorReviewsManager: React.FC = () => {
       const books: { title: string; url: string; cover: string | null }[] = data.books || [];
       if (!books.length) throw new Error('لم يتم العثور على كتب في الصفحة');
 
+      // استبعاد الكتب التي سبق نشر تقييم لها (سجل دائم)
+      const { data: reviewed } = await supabase
+        .from('noor_reviewed_books' as any)
+        .select('book_url')
+        .in('book_url', books.map((b) => b.url));
+      const already = new Set(((reviewed as any[]) || []).map((r) => r.book_url));
+
       const existing = new Set(rows.map((r) => r.book_url));
+      const skipped = books.filter((b) => already.has(b.url)).length;
       const toInsert = books
-        .filter((b) => !existing.has(b.url))
+        .filter((b) => !existing.has(b.url) && !already.has(b.url))
         .map((b, i) => ({
           title: b.title,
           book_url: b.url,
@@ -92,8 +100,9 @@ const NoorReviewsManager: React.FC = () => {
       }
       toast({
         title: 'تم السحب',
-        description: `${books.length} كتاباً من ${data.pages || 1} صفحة، أُضيف ${toInsert.length} جديداً`,
+        description: `${books.length} كتاباً من ${data.pages || 1} صفحة، أُضيف ${toInsert.length} جديداً، وتم تجاهل ${skipped} سبق تقييمها`,
       });
+
       await load();
     } catch (e: any) {
       toast({ title: 'خطأ', description: e?.message || 'تعذّر السحب', variant: 'destructive' });
