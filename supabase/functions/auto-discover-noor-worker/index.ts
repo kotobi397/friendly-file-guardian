@@ -13,6 +13,8 @@ const BASE = "https://www.noor-book.com";
 const UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36";
 const MAX_MS = 110_000;
+let startedAt = Date.now();
+
 
 // ---------- جلسة مع كوكيز ----------
 class Session {
@@ -412,20 +414,63 @@ function extractLatestCards(html: string, limit: number) {
 
 async function fetchLatestBooks(limit = 40) {
   const s = new Session();
-  await login(s);
-  const res = await s.get(`${BASE}/latest?landing=false`);
+  try {
+    await login(s);
+  } catch {
+    // صفحة أحدث الكتب عامة، نكمل بدون تسجيل دخول عند الفشل
+  }
+  const listUrl = `${BASE}/latest?landing=false`;
+  const res = await s.get(listUrl);
   const status = res.status;
   const html = res.ok ? await res.text() : "";
-  let books = html ? extractLatestCards(html, limit) : [];
-  if (!books.length && html) books = extractBookCards(html, limit);
-  return { success: true, status, count: books.length, books };
+  const csrf = html.match(/csrf_token\s*=\s*'([^']+)'/i)?.[1] ?? "";
+
+  const seen = new Set<string>();
+  const books: { title: string; url: string; cover: string | null }[] = [];
+  const push = (list: { title: string; url: string; cover: string | null }[]) => {
+    for (const b of list) {
+      if (seen.has(b.url)) continue;
+      seen.add(b.url);
+      books.push(b);
+      if (books.length >= limit) break;
+    }
+  };
+
+  const parse = (h: string) => {
+    const cards = extractLatestCards(h, limit);
+    return cards.length ? cards : extractBookCards(h, limit);
+  };
+
+  if (html) push(parse(html));
+
+  // التمرير اللانهائي في نور بوك: page_ajax=2,3,... مع نفس الجلسة والتوكن
+  let page = 1;
+  while (books.length < limit && page < 30 && Date.now() - startedAt < MAX_MS - 15_000) {
+    page++;
+    const more = await s.get(
+      `${listUrl}&page_ajax=${page}&token=${encodeURIComponent(csrf)}&ls=null`,
+      listUrl,
+    );
+    if (!more.ok) break;
+    const chunk = await more.text();
+    if (!chunk.trim() || chunk.trim() === "no_more") break;
+    const parsed = parse(chunk);
+    if (!parsed.length) break;
+    const before = books.length;
+    push(parsed);
+    if (books.length === before) break; // لا جديد
+  }
+
+  return { success: true, status, count: books.length, pages: page, books };
 }
 
 
+
 // ---------- نشر تقييم + مراجعة على كتاب في نور بوك ----------
-async function postReview(bookUrl: string, rating: number, text: string) {
-  const s = new Session();
-  await login(s);
+async function postReview(bookUrl: string, rating: number, text: string, session?: Session) {
+  const s = session ?? new Session();
+  if (!session) await login(s);
+
 
   const raw = bookUrl.startsWith("http") ? bookUrl : `${BASE}${bookUrl.startsWith("/") ? "" : "/"}${bookUrl}`;
   const path = raw.replace(/^https?:\/\/(www\.)?noor-book\.com/i, "").replace(/^\/en/, "");
@@ -494,10 +539,59 @@ async function postReview(bookUrl: string, rating: number, text: string) {
   };
 }
 
+// ---------- معالجة طابور التقييمات على الخادم (يعمل حتى والمستخدم خارج الموقع) ----------
+async function processReviewQueue(supabase: any, max = 12) {
+  const { data: rows, error } = await supabase
+    .from("noor_review_queue")
+    .select("*")
+    .eq("status", "pending")
+    .order("position", { ascending: true })
+    .order("created_at", { ascending: true })
+    .limit(max);
+  if (error) throw new Error(error.message);
+  const list = rows || [];
+  if (!list.length) return { success: true, processed: 0, ok: 0, failed: 0, message: "لا توجد كتب بانتظار التقييم" };
+
+  const s = new Session();
+  await login(s);
+
+  let ok = 0;
+  let failed = 0;
+  for (const row of list) {
+    if (Date.now() - startedAt > MAX_MS - 20_000) break;
+    await supabase
+      .from("noor_review_queue")
+      .update({ status: "running", error: null, updated_at: new Date().toISOString() })
+      .eq("id", row.id);
+    try {
+      await postReview(row.book_url, row.rating, row.review_text || "", s);
+      await supabase
+        .from("noor_review_queue")
+        .update({ status: "done", error: null, posted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq("id", row.id);
+      ok++;
+    } catch (e) {
+      await supabase
+        .from("noor_review_queue")
+        .update({
+          status: "error",
+          error: (e instanceof Error ? e.message : "خطأ غير متوقع").slice(0, 500),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", row.id);
+      failed++;
+    }
+    // فاصل زمني لتجنّب الحظر
+    await new Promise((res) => setTimeout(res, 4000));
+  }
+  return { success: true, processed: ok + failed, ok, failed };
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   const started = Date.now();
+  startedAt = started;
+
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
@@ -515,10 +609,26 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const manual = body?.manual === true;
 
+    // وضع «معالجة طابور التقييمات» — يُستدعى من الواجهة أو من cron
+    if (body?.processQueue === true) {
+      try {
+        const max = Math.min(20, Math.max(1, Number(body?.max ?? 12)));
+        return new Response(JSON.stringify(await processReviewQueue(supabase, max)), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      } catch (e) {
+        return new Response(
+          JSON.stringify({ success: false, error: e instanceof Error ? e.message : "خطأ غير متوقع" }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
+      }
+    }
+
     // وضع «سحب أحدث الكتب» من صفحة /latest
     if (body?.latest === true) {
       try {
-        const limit = Math.min(60, Math.max(1, Number(body?.limit ?? 40)));
+        const limit = Math.min(300, Math.max(1, Number(body?.limit ?? 40)));
+
         return new Response(JSON.stringify(await fetchLatestBooks(limit)), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
