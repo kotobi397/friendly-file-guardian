@@ -57,12 +57,12 @@ const NoorReviewsManager: React.FC = () => {
 
   useEffect(() => { load(); }, [load]);
 
-  // سحب كتب صفحة «أحدث الكتب» من نور بوك وإضافتها للجدول
+  // سحب كتب صفحة «أحدث الكتب» من نور بوك وإضافتها للجدول (مع التمرير لصفحات أعمق)
   const fetchLatest = async () => {
     setFetching(true);
     try {
       const { data, error } = await supabase.functions.invoke('auto-discover-noor-worker', {
-        body: { latest: true, limit: 40 },
+        body: { latest: true, limit: fetchCount },
       });
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error || 'فشل السحب');
@@ -87,7 +87,10 @@ const NoorReviewsManager: React.FC = () => {
           .upsert(toInsert as any, { onConflict: 'book_url', ignoreDuplicates: true });
         if (insErr) throw insErr;
       }
-      toast({ title: 'تم السحب', description: `${books.length} كتاباً في الصفحة، أُضيف ${toInsert.length} جديداً` });
+      toast({
+        title: 'تم السحب',
+        description: `${books.length} كتاباً من ${data.pages || 1} صفحة، أُضيف ${toInsert.length} جديداً`,
+      });
       await load();
     } catch (e: any) {
       toast({ title: 'خطأ', description: e?.message || 'تعذّر السحب', variant: 'destructive' });
@@ -95,6 +98,28 @@ const NoorReviewsManager: React.FC = () => {
       setFetching(false);
     }
   };
+
+  // تشغيل النشر على الخادم — يكمل حتى بعد إغلاق الموقع
+  const runOnServer = async () => {
+    setServerRunning(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('auto-discover-noor-worker', {
+        body: { processQueue: true, max: 20 },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || 'فشل التشغيل');
+      toast({
+        title: 'تشغيل على الخادم',
+        description: data.message || `نجح ${data.ok || 0} — فشل ${data.failed || 0} (يكمل تلقائياً كل 10 دقائق)`,
+      });
+      await load();
+    } catch (e: any) {
+      toast({ title: 'خطأ', description: e?.message || 'تعذّر التشغيل على الخادم', variant: 'destructive' });
+    } finally {
+      setServerRunning(false);
+    }
+  };
+
 
   const updateRow = async (id: string, patch: Partial<QueueRow>) => {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } as QueueRow : r)));
