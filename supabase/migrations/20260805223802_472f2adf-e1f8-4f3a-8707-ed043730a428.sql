@@ -1,0 +1,7 @@
+GRANT SELECT ON TABLE public.book_requests TO anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE public.book_requests TO authenticated;
+GRANT ALL ON TABLE public.book_requests TO service_role;
+
+GRANT SELECT ON TABLE public.book_request_votes TO anon;
+GRANT SELECT, INSERT, DELETE ON TABLE public.book_request_votes TO authenticated;
+GRANT ALL ON TABLE public.book_request_votes TO service_role;

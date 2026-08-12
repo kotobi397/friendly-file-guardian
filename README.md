@@ -1,24 +1,39 @@
-# Friendly File Guardian
+# منصة كتبي - المكتبة الرقمية العربية
 
-fg
+منصة رقمية عربية لقراءة وتصفح الكتب المجانية
 
-This project was built with [Lovable](https://lovable.dev).
+## المتطلبات التقنية
 
-## Build with Lovable
+- Node.js 18+
+- npm أو yarn
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/ba98491a-1661-4e34-a58a-cb4e186d8ce7).
+## التشغيل المحلي
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+```bash
+npm install
 npm run dev
 ```
+
+## البناء للإنتاج
+
+```bash
+npm run build
+```
+
+## الميزات
+
+- مكتبة شاملة من الكتب العربية
+- قارئ PDF متقدم
+- بحث ذكي ومرشحات متطورة
+- نظام المراجعات والتقييمات
+- دعم الوضع المظلم
+- تصميم متجاوب لجميع الأجهزة
+
+## التقنيات المستخدمة
+
+- React 18
+- TypeScript
+- Vite
+- Tailwind CSS
+- Supabase
+- React Router

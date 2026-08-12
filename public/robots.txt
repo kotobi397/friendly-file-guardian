@@ -1,14 +1,102 @@
+# Robots.txt for منصة كتبي - kotobi.xyz
+# المكتبة الرقمية العربية المجانية
+
+User-agent: *
+Allow: /
+
+# Allow search engines
 User-agent: Googlebot
+Allow: /
+
+User-agent: Googlebot-Image
 Allow: /
 
 User-agent: Bingbot
 Allow: /
 
-User-agent: Twitterbot
+User-agent: Slurp
 Allow: /
 
+User-agent: DuckDuckBot
+Allow: /
+
+User-agent: Yandex
+Allow: /
+
+# Allow social media crawlers
 User-agent: facebookexternalhit
 Allow: /
 
-User-agent: *
+User-agent: Twitterbot
 Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+User-agent: WhatsApp
+Allow: /
+
+User-agent: TelegramBot
+Allow: /
+
+# Disallow private/admin areas
+Disallow: /admin/
+Disallow: /cdn-cgi/
+Disallow: /private/
+Disallow: /_/
+Disallow: /auth
+Disallow: /reset-password
+Disallow: /profile
+Disallow: /profile-customization
+Disallow: /my-books
+Disallow: /favorites
+Disallow: /uploader-analytics
+Disallow: /daily-messages
+Disallow: /donation-success
+Disallow: /messages
+Disallow: /book/reading/
+Disallow: /pdf-reader
+Disallow: /search
+Disallow: /notifications
+Disallow: /settings
+
+# Internal file / image proxies (return 403 to crawlers by design)
+Disallow: /f/
+Disallow: /i/
+# Never crawl query-string duplicates
+Disallow: /*?*utm_
+Disallow: /*?*ref=
+
+# Allow important public pages
+Allow: /book/*
+Allow: /tahmil/*
+Allow: /qiraa/*
+Allow: /molakhas/*
+Allow: /sitemaps/*
+Allow: /category/*
+Allow: /author/*
+Allow: /user/*
+Allow: /categories
+Allow: /authors
+Allow: /quotes
+Allow: /about-us
+Allow: /contact-us
+Allow: /upload-book
+Allow: /leaderboard
+Allow: /reading-clubs
+Allow: /suggestions
+Allow: /donation
+
+# Allow assets
+Allow: /assets/
+Allow: /*.js$
+Allow: /*.css$
+Allow: /*.png$
+Allow: /*.jpg$
+Allow: /*.jpeg$
+Allow: /*.webp$
+Allow: /*.svg$
+
+# Sitemap index (points to chunked child sitemaps)
+Sitemap: https://kotobi.xyz/sitemap.xml
+
